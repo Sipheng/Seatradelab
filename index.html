@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>TradeLab — TradingView-style Charts + JS Strategy Backtester</title>
+<link rel="stylesheet" href="style.css"/>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+
+<header id="toolbar">
+  <div class="tb-group brand">⚡ TradeLab</div>
+
+  <div class="tb-group">
+    <select id="pairSelect" title="Instrument"></select>
+    <input id="symbolInput" placeholder="Custom Binance pair (e.g. DOGEUSDT)" title="Any Binance spot pair"/>
+    <button id="loadBtn" title="Load data">Load</button>
+    <select id="intervalSelect" title="Timeframe">
+      <option>15m</option>
+      <option selected>1h</option>
+      <option>4h</option>
+      <option>1d</option>
+      <option>1w</option>
+    </select>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-group" id="drawTools">
+    <button data-tool="cursor" class="tool active" title="Cursor (V)">Cursor</button>
+    <button data-tool="line" class="tool" title="Trendline (L)">Line</button>
+    <button data-tool="hline" class="tool" title="Horizontal line (H)">H-Line</button>
+    <button data-tool="box" class="tool" title="Rectangle (B)">Box</button>
+    <button data-tool="fib" class="tool" title="Fibonacci retracement (F)">Fibo</button>
+    <input type="color" id="drawColor" value="#2962ff" title="Drawing color"/>
+    <button id="delDraw" title="Delete selected (Del)">✕</button>
+    <button id="clearDraw" title="Delete all drawings on this chart">Clear</button>
+  </div>
+
+  <div class="tb-sep"></div>
+  <div class="tb-group">
+    <button id="liqToggle" class="tool" title="Toggle liquidity heatmap">💧 Liquidity</button>
+    <button id="liqSettingsBtn" title="Heatmap settings">⚙</button>
+  </div>
+
+  <div class="tb-spacer"></div>
+  <button id="panelToggle" title="Toggle side panel">☰</button>
+
+  <div id="liqPanel" class="pop hidden">
+    <label>Opacity <input type="range" id="liqOpacity" min="5" max="100" step="5"></label>
+    <label>Decay (bars) <select id="liqDecay"><option value="60">60</option><option value="150">150</option><option value="300">300</option><option value="600">600</option></select></label>
+    <label>Resolution <select id="liqBuckets"><option value="80">Low</option><option value="140">Medium</option><option value="240">High</option></select></label>
+    <div class="pop-note">Volume-at-price reconstruction from traded volume — bright bubbles mark heavy liquidity zones. Not a live order book.</div>
+  </div>
+</header>
+
+<div id="workspace">
+  <div id="chart-wrap">
+    <canvas id="heatmap"></canvas>
+    <div id="chart"></div>
+    <svg id="overlay"></svg>
+    <div id="legend"></div>
+    <div id="hint"></div>
+  </div>
+
+  <aside id="side">
+    <div id="tabs">
+      <button class="tab-btn active" data-tab="strategy">Strategy</button>
+      <button class="tab-btn" data-tab="results">Results</button>
+    </div>
+
+    <div id="tab-strategy" class="tab-page active">
+      <div class="row">
+        <label>Start cash <input id="startCash" type="number" value="10000" step="1000" min="1"/></label>
+        <select id="exampleSel"><option value="">Load example…</option></select>
+      </div>
+      <textarea id="code" spellcheck="false"></textarea>
+      <div class="row">
+        <button id="runBtn" class="primary">▶ Run Backtest</button>
+        <span id="btTime" style="color:var(--muted);font-size:11.5px"></span>
+      </div>
+      <pre id="btError"></pre>
+      <div class="docs-mini">
+        <b>Orders:</b> <code>strategy.buy({qty, sl, tp, comment})</code> · <code>strategy.sell(...)</code> ·
+        <code>strategy.close(comment)</code> · <code>strategy.position()</code><br/>
+        <b>Indicators:</b> <code>sma ema rma rsi atr stdev highest lowest macd bollinger</code><br/>
+        <b>Signals:</b> <code>crossover(a,b)</code> · <code>crossunder(a,b)</code> · <code>ref(s,n)</code> ·
+        <code>close.get(1)</code> (previous close) · <code>plot(series, color, title)</code><br/>
+        Orders fill at <b>next bar open</b>; SL/TP trigger intrabar on high/low (SL wins ties).
+      </div>
+    </div>
+
+    <div id="tab-results" class="tab-page">
+      <div id="metricsGrid"></div>
+      <canvas id="equityCanvas" height="140"></canvas>
+      <div class="row">
+        <b>Trades</b>
+        <button id="csvBtn">Export CSV</button>
+      </div>
+      <div id="tradesWrap">
+        <table id="tradesTable">
+          <thead><tr>
+            <th>Side</th><th>Qty</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Reason</th><th>Entry time</th><th>Exit time</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<footer id="statusbar">
+  <span id="statusLeft">Ready — press Load</span>
+  <span id="statusRight"></span>
+</footer>
+
+<script src="backtest.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

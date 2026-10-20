@@ -1,0 +1,99 @@
+:root{
+  --bg:#0b0e13; --bg2:#11151d; --panel:#131822; --border:#232a38;
+  --text:#dbe2ec; --muted:#8b93a6; --accent:#2962ff; --up:#26a69a; --down:#ef5350;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{height:100%}
+body{background:var(--bg); color:var(--text); font:13px/1.45 'Inter',system-ui,sans-serif;
+  display:flex; flex-direction:column; overflow:hidden}
+button,select,input,textarea{font:inherit; color:var(--text); background:var(--bg2);
+  border:1px solid var(--border); border-radius:6px; padding:5px 9px; outline:none}
+button{cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.5; cursor:default}
+button.primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600}
+button.primary:hover{filter:brightness(1.1)}
+input[type=color]{padding:1px 2px; width:36px; height:28px}
+
+/* ---------- toolbar ---------- */
+#toolbar{display:flex; align-items:center; gap:8px; padding:7px 10px;
+  background:var(--panel); border-bottom:1px solid var(--border); flex-wrap:wrap}
+.brand{font-weight:800; font-size:15px; margin-right:4px; color:#fff; white-space:nowrap}
+.tb-group{display:flex; align-items:center; gap:6px; flex-wrap:wrap}
+.tb-sep{width:1px; height:22px; background:var(--border)}
+.tb-spacer{flex:1}
+.tool.active{background:var(--accent); border-color:var(--accent); color:#fff}
+#symbolInput{width:210px}
+
+/* ---------- chart ---------- */
+#workspace{flex:1; display:flex; min-height:0}
+#chart-wrap{flex:1; position:relative; min-width:0}
+#chart{position:absolute; inset:0}
+#overlay{position:absolute; inset:0; pointer-events:none; z-index:5}
+#overlay.drawing-mode .dwg{pointer-events:none}
+.dwg{pointer-events:visiblePainted; cursor:grab}
+.dwg .handle{fill:#fff; stroke:#2962ff; stroke-width:1.5; pointer-events:all}
+.draft-catcher{pointer-events:all; cursor:crosshair}
+#legend{position:absolute; top:8px; left:10px; z-index:6; font-size:11px; color:var(--muted);
+  pointer-events:none; font-variant-numeric:tabular-nums; white-space:pre}
+#hint{position:absolute; bottom:26px; left:50%; transform:translateX(-50%); z-index:6;
+  background:rgba(17,21,29,.92); border:1px solid var(--border); padding:4px 12px;
+  border-radius:14px; font-size:11.5px; color:var(--muted); display:none; pointer-events:none}
+
+/* ---------- side panel ---------- */
+#side{width:360px; background:var(--panel); border-left:1px solid var(--border);
+  display:flex; flex-direction:column; min-height:0}
+#side.collapsed{display:none}
+#tabs{display:flex; border-bottom:1px solid var(--border)}
+.tab-btn{flex:1; background:none; border:none; border-radius:0; padding:9px;
+  color:var(--muted); border-bottom:2px solid transparent}
+.tab-btn.active{color:#fff; border-bottom-color:var(--accent)}
+.tab-page{display:none; flex:1; flex-direction:column; gap:8px; padding:10px; min-height:0; overflow:auto}
+.tab-page.active{display:flex}
+.row{display:flex; align-items:center; gap:8px; justify-content:space-between}
+.row label{color:var(--muted); font-size:12px; display:flex; align-items:center; gap:6px}
+.row input[type=number]{width:110px}
+#code{flex:1; min-height:260px; resize:vertical;
+  font-family:'JetBrains Mono',Consolas,monospace; font-size:12.5px; line-height:1.55;
+  background:#0d1117; tab-size:2; white-space:pre}
+#btError{color:var(--down); font-size:12px; white-space:pre-wrap; font-family:monospace}
+.docs-mini{font-size:11.5px; color:var(--muted); border-top:1px solid var(--border); padding-top:8px}
+.docs-mini code{color:#9ecbff; background:#0d1117; padding:1px 4px; border-radius:4px}
+
+/* ---------- results ---------- */
+#metricsGrid{display:grid; grid-template-columns:repeat(2,1fr); gap:6px}
+.metric{background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:7px 10px}
+.m-label{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px}
+.m-value{font-size:15px; font-weight:700; font-variant-numeric:tabular-nums}
+#equityCanvas{width:100%; background:var(--bg2); border:1px solid var(--border); border-radius:6px}
+#tradesWrap{flex:1; overflow:auto; border:1px solid var(--border); border-radius:6px; min-height:120px}
+#tradesTable{width:100%; border-collapse:collapse; font-size:11.5px}
+#tradesTable th{position:sticky; top:0; background:var(--bg2); color:var(--muted); font-weight:600;
+  text-align:left; padding:5px 7px; font-size:10.5px; text-transform:uppercase}
+#tradesTable td{padding:4px 7px; border-top:1px solid var(--border);
+  font-variant-numeric:tabular-nums; white-space:nowrap}
+#tradesTable tr:hover td{background:rgba(41,98,255,.06)}
+
+/* ---------- statusbar ---------- */
+#statusbar{display:flex; justify-content:space-between; gap:12px; padding:5px 12px;
+  background:var(--panel); border-top:1px solid var(--border); font-size:11.5px;
+  color:var(--muted); font-variant-numeric:tabular-nums}
+
+@media (max-width: 900px){
+  #side{position:absolute; right:0; top:38px; bottom:24px; z-index:10;
+    width:min(360px,92vw); box-shadow:-8px 0 24px rgba(0,0,0,.5)}
+}
+
+
+/* ---------- liquidity heatmap ---------- */
+#toolbar{position:relative}
+#heatmap{position:absolute; inset:0; z-index:1; pointer-events:none}
+#chart{position:absolute; inset:0; z-index:2}
+.pop{position:absolute; top:calc(100% + 6px); right:10px; z-index:60; background:var(--panel);
+  border:1px solid var(--border); border-radius:8px; padding:12px; width:250px;
+  display:flex; flex-direction:column; gap:10px; box-shadow:0 10px 30px rgba(0,0,0,.5); font-size:12px}
+.pop.hidden{display:none}
+.pop label{display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted)}
+.pop input[type=range]{width:130px}
+.pop select{width:130px}
+.pop-note{font-size:11px; color:var(--muted); border-top:1px solid var(--border); padding-top:8px}

@@ -6,8 +6,10 @@ A **TradingView-style charting web app with a built-in strategy backtester**, de
 
 ## Features
 
-- **Candlestick charts** (TradingView Lightweight Charts engine) with crosshair, OHLC legend, pan/zoom
-- **Default pair XAUUSD** (gold), plus BTC, ETH, SOL, EUR/GBP and any custom Binance pair
+- **Candlestick charts** (TradingView Lightweight Charts engine) with crosshair, OHLC legend, pan/zoom, **light (white) theme**
+- **Timeframes from 1 second to 1 week**: 1s, 1m, 3m, 5m, 15m, 30m, 1h, 4h, 1D, 1W
+- **Default pair XAUUSD** (gold), plus BTC, ETH, SOL, EUR/GBP and any custom USDT pair
+- **Multi-feed data with auto-fallback**: Binance data CDN → Binance → Binance US → OKX → Bybit (see troubleshooting below)
 - **Liquidity heatmap (BookMap-style)** 💧: bright volume-at-price "bubbles" rendered behind the candles, with configurable opacity, decay half-life and resolution
 - **Drawing tools**: Trendline, Horizontal line, Box, Fibonacci retracement
   - Click to place, drag points/handles to edit, drag whole shape to move
@@ -98,11 +100,15 @@ plot(slow, '#ff9800', 'EMA 21');
 
 More examples are built into the **Load example…** dropdown (EMA cross + ATR stops, RSI mean reversion, turtle breakout).
 
-## Data source & XAUUSD note
+## Data source, feeds & troubleshooting
 
-Market data comes from the **Binance public klines API** (no key needed). There is no free CORS-enabled spot-gold/forex OHLC feed, so **XAUUSD is proxied by `PAXGUSDT`** (Pax Gold, a gold-backed token that tracks the spot price closely). To use a real broker feed, replace `API_BASE` / `loadData()` in `app.js` with any REST API that returns OHLCV.
+The app walks a **fallback chain** of free public feeds until one answers (no API keys needed):
+`data-api.binance.vision` → `api.binance.com` → `api.binance.us` → **OKX** → **Bybit**.
+The active feed is shown in the status bar (e.g. `1000 bars · via OKX`).
 
-> Binance API is geo-blocked in some countries (e.g. the US). If data fails to load, point `API_BASE` to a relay/proxy or another feed.
+- **XAUUSD** is proxied by **PAXGUSDT** (Pax Gold — a gold-backed token tracking spot gold), available on all feeds in the chain. There is no free CORS-enabled spot-gold/forex OHLC feed.
+- **1s timeframe** only exists on Binance feeds; OKX/Bybit start at 1m.
+- If your network blocks some exchanges (certain ISPs/countries block Binance domains), the chain automatically falls back to OKX/Bybit. If **all** feeds fail: check VPN/ad-blocker, or add your own relay as a new entry in the `FEEDS` list in `app.js` (any REST API returning OHLCV works — see the existing entries for the format).
 
 ## Roadmap ideas
 

@@ -1,6 +1,6 @@
 :root{
-  --bg:#0b0e13; --bg2:#11151d; --panel:#131822; --border:#232a38;
-  --text:#dbe2ec; --muted:#8b93a6; --accent:#2962ff; --up:#26a69a; --down:#ef5350;
+  --bg:#ffffff; --bg2:#f4f6f9; --panel:#f8fafc; --border:#dde3ec;
+  --text:#1f2733; --muted:#66707f; --accent:#2962ff; --up:#12997b; --down:#e5484d;
 }
 *{box-sizing:border-box; margin:0; padding:0}
 html,body{height:100%}
@@ -37,7 +37,7 @@ input[type=color]{padding:1px 2px; width:36px; height:28px}
 #legend{position:absolute; top:8px; left:10px; z-index:6; font-size:11px; color:var(--muted);
   pointer-events:none; font-variant-numeric:tabular-nums; white-space:pre}
 #hint{position:absolute; bottom:26px; left:50%; transform:translateX(-50%); z-index:6;
-  background:rgba(17,21,29,.92); border:1px solid var(--border); padding:4px 12px;
+  background:rgba(255,255,255,.95); border:1px solid var(--border); padding:4px 12px;
   border-radius:14px; font-size:11.5px; color:var(--muted); display:none; pointer-events:none}
 
 /* ---------- side panel ---------- */
@@ -55,10 +55,10 @@ input[type=color]{padding:1px 2px; width:36px; height:28px}
 .row input[type=number]{width:110px}
 #code{flex:1; min-height:260px; resize:vertical;
   font-family:'JetBrains Mono',Consolas,monospace; font-size:12.5px; line-height:1.55;
-  background:#0d1117; tab-size:2; white-space:pre}
+  background:#f7f9fc; tab-size:2; white-space:pre}
 #btError{color:var(--down); font-size:12px; white-space:pre-wrap; font-family:monospace}
 .docs-mini{font-size:11.5px; color:var(--muted); border-top:1px solid var(--border); padding-top:8px}
-.docs-mini code{color:#9ecbff; background:#0d1117; padding:1px 4px; border-radius:4px}
+.docs-mini code{color:#0550ae; background:#eef1f6; padding:1px 4px; border-radius:4px}
 
 /* ---------- results ---------- */
 #metricsGrid{display:grid; grid-template-columns:repeat(2,1fr); gap:6px}

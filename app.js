@@ -8,9 +8,60 @@ const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const NS = 'http://www.w3.org/2000/svg';
 
-// ---- data feed: Binance public klines. Change this if geo-blocked
-//      (e.g. a CORS-friendly relay, Twelve Data, Finnhub, your own API).
-const API_BASE = 'https://api.binance.com';
+// ---- market data feeds: auto-fallback chain ----
+// Some networks/ISPs block specific exchanges (e.g. api.binance.com is
+// unreachable from various regions). The app walks this list and uses the
+// first feed that answers. Add your own relay/proxy as another entry.
+const binanceParse = raw => raw.map(k => ({
+  time: Math.floor(k[0] / 1000),
+  open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
+}));
+const FEEDS = [
+  { name: 'Binance data CDN',
+    supports: () => true,
+    url: (s, iv) => 'https://data-api.binance.vision/api/v3/klines?symbol=' + s + '&interval=' + iv + '&limit=1000',
+    parse: binanceParse },
+  { name: 'Binance',
+    supports: () => true,
+    url: (s, iv) => 'https://api.binance.com/api/v3/klines?symbol=' + s + '&interval=' + iv + '&limit=1000',
+    parse: binanceParse },
+  { name: 'Binance US',
+    supports: () => true,
+    url: (s, iv) => 'https://api.binance.us/api/v3/klines?symbol=' + s + '&interval=' + iv + '&limit=1000',
+    parse: binanceParse },
+  { name: 'OKX',
+    supports: (s, iv) => s.endsWith('USDT') && iv !== '1s',
+    ivMap: { '1m': '1m', '3m': '3m', '5m': '5m', '15m': '15m', '30m': '30m', '1h': '1H', '4h': '4H', '1d': '1D', '1w': '1W' },
+    url: (s, iv, f) => 'https://www.okx.com/api/v5/market/candles?instId=' + s.slice(0, -4) + '-USDT&bar=' + f.ivMap[iv] + '&limit=1000',
+    parse: raw => (raw.data || []).map(k => ({
+      time: Math.floor(+k[0] / 1000),
+      open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
+    })).reverse() },                                    // OKX returns newest-first
+  { name: 'Bybit',
+    supports: (s, iv) => iv !== '1s',
+    ivMap: { '1m': '1', '3m': '3', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '4h': '240', '1d': 'D', '1w': 'W' },
+    url: (s, iv, f) => 'https://api.bybit.com/v5/market/kline?category=spot&symbol=' + s + '&interval=' + f.ivMap[iv] + '&limit=1000',
+    parse: raw => ((raw.result && raw.result.list) || []).map(k => ({
+      time: Math.floor(+k[0] / 1000),
+      open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
+    })).reverse() },                                    // Bybit returns newest-first
+];
+
+function fetchJson(url, ms = 9000) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  return fetch(url, { signal: ctl.signal })
+    .finally(() => clearTimeout(t))
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+}
+
+// remember symbol + timeframe between visits
+const prefs = Object.assign({ symbol: 'PAXGUSDT', interval: '1h' },
+  JSON.parse(localStorage.getItem('tradelab.prefs') || '{}'));
+function savePrefs() {
+  localStorage.setItem('tradelab.prefs',
+    JSON.stringify({ symbol: state.symbol, interval: state.interval }));
+}
 
 // XAUUSD maps to PAXGUSDT (gold-backed token tracking spot gold) since
 // free spot-forex OHLC feeds with CORS do not exist.
@@ -26,7 +77,9 @@ const PAIRS = [
   { label: 'GBPUSD',  binance: 'GBPUSDT'  },
 ];
 
-const state = { symbol: 'PAXGUSDT', display: 'XAUUSD', interval: '1h', bars: [], loaded: false };
+const _p = PAIRS.find(p => p.binance === prefs.symbol);
+const state = { symbol: prefs.symbol, display: (_p || {}).label || prefs.symbol,
+                interval: prefs.interval, bars: [], loaded: false, feed: '' };
 const NEED = { line: 2, box: 2, fib: 2, hline: 1 };
 
 const fmt = v => v == null || isNaN(v) ? '-' :
@@ -37,16 +90,16 @@ const fmt = v => v == null || isNaN(v) ? '-' :
 const wrap = $('#chart-wrap');
 const chartEl = $('#chart');
 const chart = LightweightCharts.createChart(chartEl, {
-  layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#8b93a6', fontSize: 11,
+  layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#66707f', fontSize: 11,
             fontFamily: "'Inter', system-ui, sans-serif" },
-  grid: { vertLines: { color: '#161b25' }, horzLines: { color: '#161b25' } },
+  grid: { vertLines: { color: '#eef1f6' }, horzLines: { color: '#eef1f6' } },
   crosshair: {
     mode: LightweightCharts.CrosshairMode.Normal,
-    vertLine: { color: '#3a4356', labelBackgroundColor: '#2962ff' },
-    horzLine: { color: '#3a4356', labelBackgroundColor: '#2962ff' },
+    vertLine: { color: '#b9c2cf', labelBackgroundColor: '#2962ff' },
+    horzLine: { color: '#b9c2cf', labelBackgroundColor: '#2962ff' },
   },
-  rightPriceScale: { borderColor: '#232a38' },
-  timeScale: { borderColor: '#232a38', timeVisible: true, secondsVisible: false, rightOffset: 4 },
+  rightPriceScale: { borderColor: '#dde3ec' },
+  timeScale: { borderColor: '#dde3ec', timeVisible: true, secondsVisible: false, rightOffset: 4 },
 });
 const candleSeries = chart.addCandlestickSeries({
   upColor: '#26a69a', downColor: '#ef5350',
@@ -80,32 +133,40 @@ async function loadData() {
   if (!state.symbol || state.symbol.length < 5) { setStatus('Enter a valid pair symbol'); return; }
   $('#loadBtn').disabled = true;
   setStatus('Loading ' + state.display + ' ' + state.interval + ' …');
-  try {
-    const url = API_BASE + '/api/v3/klines?symbol=' + state.symbol +
-                '&interval=' + state.interval + '&limit=1000';
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const raw = await res.json();
-    if (!Array.isArray(raw) || !raw.length) throw new Error('empty dataset');
-    state.bars = raw.map(k => ({
-      time: Math.floor(k[0] / 1000),
-      open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
-    }));
-    candleSeries.setData(state.bars);
-    chart.timeScale().fitContent();
-    candleSeries.setMarkers([]);
-    plotPool.forEach(s => chart.removeSeries(s)); plotPool.length = 0;
-    dw.load(); dw.render();
-    hmBuild();
-    state.loaded = true;
-    const lastT = new Date(state.bars[state.bars.length - 1].time * 1000).toUTCString();
-    setStatus(state.display + ' · ' + state.interval + ' · ' + state.bars.length +
-              ' bars · last bar ' + lastT);
-    setLastInfo();
-  } catch (e) {
-    setStatus('Data error: ' + e.message +
-      ' — Binance API is geo-blocked in some regions; set API_BASE in app.js to a relay/proxy or another feed.');
-  } finally { $('#loadBtn').disabled = false; }
+  const tried = [];
+  let loaded = false;
+  for (const f of FEEDS) {
+    if (!f.supports(state.symbol, state.interval)) continue;
+    try {
+      const raw = await fetchJson(f.url(state.symbol, state.interval, f));
+      const bars = f.parse(raw)
+        .filter(b => isFinite(b.open) && isFinite(b.high) && isFinite(b.low) && isFinite(b.close))
+        .sort((a, b) => a.time - b.time);
+      if (bars.length < 2) throw new Error('empty dataset');
+      state.bars = bars;
+      state.feed = f.name;
+      candleSeries.setData(state.bars);
+      chart.timeScale().fitContent();
+      candleSeries.setMarkers([]);
+      plotPool.forEach(s => chart.removeSeries(s)); plotPool.length = 0;
+      dw.load(); dw.render();
+      hmBuild();
+      state.loaded = true;
+      savePrefs();
+      const lastT = new Date(state.bars[state.bars.length - 1].time * 1000).toUTCString();
+      setStatus(state.display + ' · ' + state.interval + ' · ' + state.bars.length +
+                ' bars · via ' + f.name + ' · last bar ' + lastT);
+      setLastInfo();
+      loaded = true;
+      break;
+    } catch (e) { tried.push(f.name); }
+  }
+  if (!loaded) {
+    setStatus('All data feeds unreachable (tried: ' +
+      (tried.join(', ') || 'none supports this timeframe') +
+      '). Check connection / VPN / ad-blocker, or add a relay feed in the FEEDS list in app.js.');
+  }
+  $('#loadBtn').disabled = false;
 }
 
 // ================= drawing tools =================
@@ -282,7 +343,7 @@ function updateHint() {
 const hmCv = $('#heatmap');
 const hm = {
   enabled: false, off: null, bins: 0, pMin: 0, pBin: 0, raf: 0, dpr: 1,
-  settings: Object.assign({ opacity: 55, decayHL: 150, buckets: 140, enabled: false },
+  settings: Object.assign({ opacity: 60, decayHL: 150, buckets: 140, enabled: false },
     JSON.parse(localStorage.getItem('tradelab.hm') || '{}')),
 };
 hm.enabled = !!hm.settings.enabled;
@@ -291,7 +352,7 @@ function hmSaveSettings() { localStorage.setItem('tradelab.hm', JSON.stringify(h
 
 const hmLUT = (() => {
   const lut = [];
-  const stops = [[38, 62, 160], [0, 190, 255], [255, 226, 60], [255, 122, 40], [255, 244, 244]];
+  const stops = [[170, 194, 255], [102, 206, 255], [255, 214, 90], [255, 146, 62], [238, 92, 78]];
   for (let k = 0; k <= 64; k++) {
     const pos = (k / 64) * (stops.length - 1);
     const i0 = Math.min(Math.floor(pos), stops.length - 2), f = pos - i0;
@@ -477,7 +538,7 @@ function drawEquity(eq) {
   ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
   ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
   ctx.fillStyle = grad; ctx.fill();
-  ctx.fillStyle = '#8b93a6'; ctx.font = '10px system-ui';
+  ctx.fillStyle = '#98a2b3'; ctx.font = '10px system-ui';
   ctx.fillText(max.toFixed(2), 4, 10);
   ctx.fillText(min.toFixed(2), 4, h - 4);
 }
@@ -583,6 +644,8 @@ function init() {
     sel.appendChild(o);
   }
   sel.value = state.symbol;
+  if (!PAIRS.some(p => p.binance === state.symbol)) $('#symbolInput').value = state.symbol;
+  $('#intervalSelect').value = state.interval;
   sel.onchange = () => {
     state.symbol = sel.value;
     state.display = (PAIRS.find(p => p.binance === sel.value) || {}).label || sel.value;

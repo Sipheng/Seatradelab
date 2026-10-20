@@ -7,47 +7,59 @@
 const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const NS = 'http://www.w3.org/2000/svg';
+const VERSION = '1.3.0';
 
 // ---- market data feeds: auto-fallback chain ----
-// Some networks/ISPs block specific exchanges (e.g. api.binance.com is
-// unreachable from various regions). The app walks this list and uses the
-// first feed that answers. Add your own relay/proxy as another entry.
+// Networks block different exchanges (many ISPs in Asia block Binance's
+// main domains). The app walks this list and uses the first feed that
+// answers: direct exchange APIs first, then CORS relays, then CoinGecko.
+// Add your own relay/proxy as another entry if needed.
 const binanceParse = raw => raw.map(k => ({
   time: Math.floor(k[0] / 1000),
   open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
 }));
+const okxParse = raw => (raw.data || []).map(k => ({
+  time: Math.floor(+k[0] / 1000),
+  open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
+})).reverse();                                   // OKX returns newest-first
+const bybitParse = raw => ((raw.result && raw.result.list) || []).map(k => ({
+  time: Math.floor(+k[0] / 1000),
+  open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
+})).reverse();                                   // Bybit returns newest-first
+const OKX_IVS   = { '1m':'1m','3m':'3m','5m':'5m','15m':'15m','30m':'30m','1h':'1H','4h':'4H','1d':'1D','1w':'1W' };
+const BYBIT_IVS = { '1m':'1','3m':'3','5m':'5','15m':'15','30m':'30','1h':'60','4h':'240','1d':'D','1w':'W' };
+const binanceUrl = host => (s, iv) => host + '/api/v3/klines?symbol=' + s + '&interval=' + iv + '&limit=1000';
+const okxUrl = () => (s, iv) => 'https://www.okx.com/api/v5/market/candles?instId=' + s.slice(0, -4) + '-USDT&bar=' + OKX_IVS[iv] + '&limit=1000';
+const bybitUrl = () => (s, iv) => 'https://api.bybit.com/v5/market/kline?category=spot&symbol=' + s + '&interval=' + BYBIT_IVS[iv] + '&limit=1000';
+const relay = target => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(target);
+
+// CoinGecko: no key, rarely ISP-blocked; coarser granularity, no volume (last resort)
+const CG_MAP  = { PAXGUSDT:'pax-gold', BTCUSDT:'bitcoin', ETHUSDT:'ethereum', SOLUSDT:'solana',
+                  BNBUSDT:'binancecoin', XRPUSDT:'ripple', DOGEUSDT:'dogecoin' };
+const CG_DAYS = { '30m':1, '1h':1, '4h':7, '1d':90, '1w':365 };
+
 const FEEDS = [
-  { name: 'Binance data CDN',
-    supports: () => true,
-    url: (s, iv) => 'https://data-api.binance.vision/api/v3/klines?symbol=' + s + '&interval=' + iv + '&limit=1000',
-    parse: binanceParse },
-  { name: 'Binance',
-    supports: () => true,
-    url: (s, iv) => 'https://api.binance.com/api/v3/klines?symbol=' + s + '&interval=' + iv + '&limit=1000',
-    parse: binanceParse },
-  { name: 'Binance US',
-    supports: () => true,
-    url: (s, iv) => 'https://api.binance.us/api/v3/klines?symbol=' + s + '&interval=' + iv + '&limit=1000',
-    parse: binanceParse },
-  { name: 'OKX',
-    supports: (s, iv) => s.endsWith('USDT') && iv !== '1s',
-    ivMap: { '1m': '1m', '3m': '3m', '5m': '5m', '15m': '15m', '30m': '30m', '1h': '1H', '4h': '4H', '1d': '1D', '1w': '1W' },
-    url: (s, iv, f) => 'https://www.okx.com/api/v5/market/candles?instId=' + s.slice(0, -4) + '-USDT&bar=' + f.ivMap[iv] + '&limit=1000',
-    parse: raw => (raw.data || []).map(k => ({
-      time: Math.floor(+k[0] / 1000),
-      open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
-    })).reverse() },                                    // OKX returns newest-first
-  { name: 'Bybit',
-    supports: (s, iv) => iv !== '1s',
-    ivMap: { '1m': '1', '3m': '3', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '4h': '240', '1d': 'D', '1w': 'W' },
-    url: (s, iv, f) => 'https://api.bybit.com/v5/market/kline?category=spot&symbol=' + s + '&interval=' + f.ivMap[iv] + '&limit=1000',
-    parse: raw => ((raw.result && raw.result.list) || []).map(k => ({
-      time: Math.floor(+k[0] / 1000),
-      open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
-    })).reverse() },                                    // Bybit returns newest-first
+  { name: 'Binance data CDN', supports: () => true, url: binanceUrl('https://data-api.binance.vision'), parse: binanceParse },
+  { name: 'Binance',          supports: () => true, url: binanceUrl('https://api.binance.com'),         parse: binanceParse },
+  { name: 'Binance US',       supports: () => true, url: binanceUrl('https://api.binance.us'),          parse: binanceParse },
+  { name: 'OKX',              supports: (s, iv) => s.endsWith('USDT') && iv !== '1s', url: okxUrl(),   parse: okxParse },
+  { name: 'Bybit',            supports: (s, iv) => iv !== '1s',                    url: bybitUrl(),  parse: bybitParse },
+  // --- CORS relays: fetch server-side, so they work even when the ISP
+  //     blocks the exchange domains themselves ---
+  { name: 'Binance (relay)',  supports: () => true, url: (s, iv) => relay(binanceUrl('https://api.binance.com')(s, iv)), parse: binanceParse },
+  { name: 'OKX (relay)',      supports: (s, iv) => s.endsWith('USDT') && iv !== '1s', url: (s, iv) => relay(okxUrl()(s, iv)),  parse: okxParse },
+  { name: 'Bybit (relay)',    supports: (s, iv) => iv !== '1s',                    url: (s, iv) => relay(bybitUrl()(s, iv)), parse: bybitParse },
+  // --- last resort: CoinGecko aggregated OHLC (no volume -> heatmap off) ---
+  { name: 'CoinGecko',
+    supports: (s, iv) => !!CG_MAP[s] && !!CG_DAYS[iv],
+    url: (s, iv) => 'https://api.coingecko.com/api/v3/coins/' + CG_MAP[s] + '/ohlc?vs_currency=usd&days=' + CG_DAYS[iv],
+    parse: raw => (Array.isArray(raw) ? raw : []).map(k => ({
+      time: k[0] > 1e12 ? Math.floor(k[0] / 1000) : k[0],
+      open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: 0,
+    })) },
 ];
 
-function fetchJson(url, ms = 9000) {
+function fetchJson(url, ms = 6000) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), ms);
   return fetch(url, { signal: ctl.signal })
@@ -708,6 +720,8 @@ function init() {
   dc.onchange = () => { hm.settings.decayHL = +dc.value; hmSaveSettings(); hmBuild(); };
   bk.onchange = () => { hm.settings.buckets = +bk.value; hmSaveSettings(); hmBuild(); };
 
+  setStatus('TradeLab v' + VERSION + ' · connecting…');
+  console.log('%cTradeLab v' + VERSION, 'color:#2962ff;font-weight:bold');
   loadData();
 }
 

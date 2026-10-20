@@ -103,8 +103,17 @@ More examples are built into the **Load example…** dropdown (EMA cross + ATR s
 ## Data source, feeds & troubleshooting
 
 The app walks a **fallback chain** of free public feeds until one answers (no API keys needed):
-`data-api.binance.vision` → `api.binance.com` → `api.binance.us` → **OKX** → **Bybit**.
-The active feed is shown in the status bar (e.g. `1000 bars · via OKX`).
+`data-api.binance.vision` → `api.binance.com` → `api.binance.us` → **OKX** → **Bybit** →
+**CORS relays** (allorigins — server-side fetch, works even when the ISP blocks exchange domains) →
+**CoinGecko** (last resort; coarser timeframes, no volume).
+The active feed is shown in the status bar (e.g. `1000 bars · via OKX (relay)`).
+
+### "Data error: Failed to fetch" — checklist
+
+1. **That exact message only exists in builds before v1.2.** Check which version is running: press `F12` — the console prints `TradeLab vX.Y.Z` (current release: **v1.3.0**). If it doesn't say v1.3.0, the browser is serving a **cached old `app.js`**.
+2. Hard-refresh with `Ctrl+Shift+R` (GitHub Pages caches files for ~10 minutes; after pushing, wait 1–2 min first).
+3. Confirm the repo actually contains the new files: open `https://raw.githubusercontent.com/<you>/tradelab/main/app.js` and search for `FEEDS` — if it's not there, the push didn't happen (or you edited `app.js` locally per older advice and it was overwritten/conflicted).
+4. If the status bar says `All data feeds unreachable (tried: …)` on v1.3.0+, then your network blocks every exchange **and** the relays — try a VPN, mobile hotspot, or disable ad-blockers/privacy extensions that intercept requests.
 
 - **XAUUSD** is proxied by **PAXGUSDT** (Pax Gold — a gold-backed token tracking spot gold), available on all feeds in the chain. There is no free CORS-enabled spot-gold/forex OHLC feed.
 - **1s timeframe** only exists on Binance feeds; OKX/Bybit start at 1m.
